@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import CompressView from '../views/CompressView.vue'
+import BgRemoverView from '../views/BgRemover.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,9 +17,9 @@ const router = createRouter({
     {
       path: '/bg-remover',
       name: 'bg-remover',
-      // Lazy loading this view to keep initial load lightning fast
-      component: () => import('../views/BgRemover.vue')
-    }
+      component: BgRemoverView
+    },
+
   ]
 })
 
