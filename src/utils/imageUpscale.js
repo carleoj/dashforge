@@ -55,6 +55,10 @@ export function upscaleImage(file, { scale = 2, sharpen = true, format = 'image/
 
       ctx.imageSmoothingEnabled = true
       ctx.imageSmoothingQuality = 'high'
+      if (format === 'image/jpeg') {
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, width, height)
+      }
       ctx.drawImage(img, 0, 0, width, height)
 
       if (sharpen) applySharpen(ctx, width, height)

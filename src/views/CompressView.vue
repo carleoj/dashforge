@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import {
   compressImage,
   formatBytes,
@@ -39,6 +39,7 @@ const formatOptions = [
 ]
 
 const completedCount = computed(() => files.value.filter((f) => f.status === 'done').length)
+const isCompressing = computed(() => files.value.some((f) => f.status === 'compressing'))
 const totalSaved = computed(() => {
   return files.value.reduce((sum, f) => {
     if (f.status !== 'done' || !f.compressedSize) return sum
@@ -66,6 +67,7 @@ const addFiles = (fileList) => {
       name: file.name,
       originalUrl: URL.createObjectURL(file),
       compressedUrl: null,
+      outputMimeType: null,
       originalSize: file.size,
       compressedSize: null,
       status: 'pending',
@@ -135,9 +137,11 @@ const compressEntry = async (entry) => {
     URL.revokeObjectURL(entry.compressedUrl)
     entry.compressedUrl = null
     entry.compressedSize = null
+    entry.outputMimeType = null
   }
 
   try {
+    const mimeType = getOutputMimeType(entry.file, outputFormat.value)
     const blob = await compressImage(entry.file, {
       quality: quality.value,
       maxDimension: maxDimension.value,
@@ -146,6 +150,7 @@ const compressEntry = async (entry) => {
 
     entry.compressedUrl = URL.createObjectURL(blob)
     entry.compressedSize = blob.size
+    entry.outputMimeType = mimeType
     entry.status = 'done'
   } catch (err) {
     entry.status = 'error'
@@ -161,7 +166,7 @@ const compressAll = async () => {
 const downloadFile = (entry) => {
   if (!entry.compressedUrl) return
 
-  const mimeType = getOutputMimeType(entry.file, outputFormat.value)
+  const mimeType = entry.outputMimeType || getOutputMimeType(entry.file, outputFormat.value)
   const ext = getDownloadExtension(mimeType)
   const baseName = entry.name.replace(/\.[^.]+$/, '')
 
@@ -174,27 +179,6 @@ const downloadFile = (entry) => {
 const downloadAll = () => {
   files.value.filter((f) => f.status === 'done').forEach(downloadFile)
 }
-
-watch([quality, maxDimension, outputFormat], () => {
-  if (!files.value.length) return
-  files.value.forEach((entry) => {
-    if (entry.status === 'done' || entry.status === 'error') {
-      compressEntry(entry)
-    }
-  })
-})
-
-watch(
-  () => files.value.filter((f) => f.status === 'pending').map((f) => f.id),
-  (pendingIds) => {
-    if (!pendingIds.length) return
-    pendingIds.forEach((id) => {
-      const entry = files.value.find((f) => f.id === id)
-      if (entry?.status === 'pending') compressEntry(entry)
-    })
-  },
-  { deep: true }
-)
 </script>
 
 <template>
@@ -211,78 +195,6 @@ watch(
     </div>
 
     <div class="max-w-5xl mx-auto space-y-6">
-      <!-- Settings -->
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Quality</h2>
-              <span class="text-sm font-bold text-indigo-600 tabular-nums">{{ quality }}%</span>
-            </div>
-            <input
-              v-model.number="quality"
-              type="range"
-              min="10"
-              max="100"
-              step="1"
-              class="w-full h-2 rounded-full appearance-none bg-slate-200 accent-indigo-600 cursor-pointer"
-            />
-            <div class="flex justify-between mt-1.5 text-xs text-slate-400">
-              <span>Smaller</span>
-              <span>Better</span>
-            </div>
-          </div>
-
-          <div>
-            <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Presets</h2>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                v-for="preset in presets"
-                :key="preset.label"
-                type="button"
-                @click="applyPreset(preset)"
-                class="px-2.5 py-2 rounded-lg text-left border transition-all cursor-pointer"
-                :class="quality === preset.quality
-                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
-                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
-              >
-                <span class="block text-xs font-medium text-slate-800">{{ preset.label }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Max dimension</h2>
-            <select
-              v-model="maxDimension"
-              class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white cursor-pointer"
-            >
-              <option v-for="option in dimensionOptions" :key="option.label" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Output format</h2>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="option in formatOptions"
-                :key="option.value"
-                type="button"
-                @click="outputFormat = option.value"
-                class="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer"
-                :class="outputFormat === option.value
-                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Main workspace -->
       <div class="space-y-6">
         <!-- Drop zone -->
@@ -325,6 +237,93 @@ watch(
           </div>
         </div>
 
+        <!-- Settings -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Quality</h2>
+                <span class="text-sm font-bold text-indigo-600 tabular-nums">{{ quality }}%</span>
+              </div>
+              <input
+                v-model.number="quality"
+                type="range"
+                min="10"
+                max="100"
+                step="1"
+                :disabled="isCompressing"
+                class="w-full h-2 rounded-full appearance-none bg-slate-200 accent-indigo-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <div class="flex justify-between mt-1.5 text-xs text-slate-400">
+                <span>Smaller</span>
+                <span>Better</span>
+              </div>
+            </div>
+
+            <div>
+              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Presets</h2>
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  v-for="preset in presets"
+                  :key="preset.label"
+                  type="button"
+                  :disabled="isCompressing"
+                  @click="applyPreset(preset)"
+                  class="px-2.5 py-2 rounded-lg text-left border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="quality === preset.quality
+                    ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
+                >
+                  <span class="block text-xs font-medium text-slate-800">{{ preset.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Max dimension</h2>
+              <select
+                v-model="maxDimension"
+                :disabled="isCompressing"
+                class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option v-for="option in dimensionOptions" :key="option.label" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Output format</h2>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="option in formatOptions"
+                  :key="option.value"
+                  type="button"
+                  :disabled="isCompressing"
+                  @click="outputFormat = option.value"
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="outputFormat === option.value
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="files.length" class="mt-5 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              :disabled="isCompressing"
+              @click="compressAll"
+              class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ completedCount ? 'Re-compress images' : 'Compress images' }}
+            </button>
+          </div>
+        </div>
+
         <!-- Results summary bar -->
         <div
           v-if="files.length"
@@ -343,10 +342,11 @@ watch(
           <div class="flex items-center gap-2">
             <button
               type="button"
+              :disabled="isCompressing"
               @click="compressAll"
-              class="px-3 py-1.5 rounded-lg text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Re-compress all
+              {{ completedCount ? 'Re-compress all' : 'Compress all' }}
             </button>
             <button
               v-if="completedCount"

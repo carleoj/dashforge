@@ -1,41 +1,59 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
-import EraserCanvas from '../components/EraserCanvas.vue'
-import { isImageFile, formatBytes } from '../utils/imageCompress.js'
-import { removeImageBackground } from '../utils/backgroundRemoval.js'
+import {
+  formatBytes,
+  getDownloadExtension,
+  getOutputMimeType,
+  isImageFile
+} from '../utils/imageCompress.js'
+import { upscaleImage } from '../utils/imageUpscale.js'
 
-const model = ref('balanced')
+const scale = ref(2)
+const outputFormat = ref('auto')
+const quality = ref(92)
+const sharpen = ref(true)
 const isDragging = ref(false)
 const dragCounter = ref(0)
 const fileInput = ref(null)
-const eraserRef = ref(null)
-const showEditor = ref(false)
 
 const image = ref(null)
 const status = ref('idle')
-const progress = ref(0)
-const progressStage = ref('')
 const processingMessageIndex = ref(0)
 const processingMessageTimer = ref(null)
 const error = ref(null)
 
-const modelOptions = [
-  { label: 'Fast', value: 'fast', hint: 'Quicker, lighter' },
-  { label: 'Balanced', value: 'balanced', hint: 'Recommended' },
-  { label: 'Quality', value: 'quality', hint: 'Best edges' }
+const scaleOptions = [
+  { label: '2x', value: 2, hint: 'Clean boost' },
+  { label: '3x', value: 3, hint: 'Large screens' },
+  { label: '4x', value: 4, hint: 'Max detail' }
+]
+
+const formatOptions = [
+  { label: 'Auto', value: 'auto' },
+  { label: 'JPEG', value: 'image/jpeg' },
+  { label: 'PNG', value: 'image/png' },
+  { label: 'WebP', value: 'image/webp' }
 ]
 
 const processingMessages = [
-  'Reading the image and preparing the mask.',
-  'Finding the subject edges.',
-  'Separating the foreground from the background.',
-  'Refining hair, fabric, and soft details.',
-  'Compositing the transparent PNG.'
+  'Reading the source pixels.',
+  'Expanding the canvas resolution.',
+  'Smoothing enlarged details.',
+  'Rebuilding edges for a cleaner result.',
+  'Encoding the upscaled image.'
 ]
 
 const hasResult = computed(() => status.value === 'done' && image.value?.resultUrl)
 const isProcessing = computed(() => status.value === 'processing')
 const processingMessage = computed(() => processingMessages[processingMessageIndex.value])
+const resultDimensions = computed(() => {
+  if (!image.value?.resultWidth || !image.value?.resultHeight) return ''
+  return `${image.value.resultWidth} x ${image.value.resultHeight}px`
+})
+const originalDimensions = computed(() => {
+  if (!image.value?.originalWidth || !image.value?.originalHeight) return ''
+  return `${image.value.originalWidth} x ${image.value.originalHeight}px`
+})
 
 const stopProcessingMessages = () => {
   if (!processingMessageTimer.value) return
@@ -48,15 +66,13 @@ const startProcessingMessages = () => {
   processingMessageIndex.value = 0
   processingMessageTimer.value = setInterval(() => {
     processingMessageIndex.value = (processingMessageIndex.value + 1) % processingMessages.length
-  }, 2200)
+  }, 2000)
 }
 
 const revokeUrls = (entry) => {
   if (!entry) return
   if (entry.originalUrl) URL.revokeObjectURL(entry.originalUrl)
   if (entry.resultUrl) URL.revokeObjectURL(entry.resultUrl)
-  if (entry.resultBaseUrl) URL.revokeObjectURL(entry.resultBaseUrl)
-  if (entry.editedUrl) URL.revokeObjectURL(entry.editedUrl)
 }
 
 const resetWorkspace = () => {
@@ -64,11 +80,7 @@ const resetWorkspace = () => {
   revokeUrls(image.value)
   image.value = null
   status.value = 'idle'
-  progress.value = 0
-  progressStage.value = ''
   error.value = null
-  showEditor.value = false
-  startProcessingMessages()
 }
 
 const openFilePicker = () => {
@@ -86,9 +98,11 @@ const loadFile = (file) => {
     originalSize: file.size,
     originalUrl: URL.createObjectURL(file),
     resultUrl: null,
-    resultBaseUrl: null,
-    editedUrl: null,
-    resultSize: null
+    resultSize: null,
+    originalWidth: null,
+    originalHeight: null,
+    resultWidth: null,
+    resultHeight: null
   }
   status.value = 'ready'
 }
@@ -130,60 +144,50 @@ const processImage = async () => {
   if (!image.value?.file) return
 
   status.value = 'processing'
-  progress.value = 0
-  progressStage.value = 'Preparing…'
   error.value = null
-  showEditor.value = false
+  startProcessingMessages()
 
-  if (image.value.resultUrl) URL.revokeObjectURL(image.value.resultUrl)
-  if (image.value.resultBaseUrl) URL.revokeObjectURL(image.value.resultBaseUrl)
-  image.value.resultUrl = null
-  image.value.resultBaseUrl = null
-  image.value.editedUrl = null
+  if (image.value.resultUrl) {
+    URL.revokeObjectURL(image.value.resultUrl)
+    image.value.resultUrl = null
+    image.value.resultSize = null
+  }
 
   try {
-    const blob = await removeImageBackground(image.value.file, {
-      model: model.value,
-      onProgress: ({ stage, percent }) => {
-        progressStage.value = stage
-        progress.value = percent
-      }
+    const mimeType = getOutputMimeType(image.value.file, outputFormat.value)
+    const result = await upscaleImage(image.value.file, {
+      scale: scale.value,
+      sharpen: sharpen.value,
+      format: mimeType,
+      quality: quality.value / 100
     })
 
-    const resultUrl = URL.createObjectURL(blob)
-    image.value.resultUrl = resultUrl
-    image.value.resultBaseUrl = resultUrl
-    image.value.resultSize = blob.size
+    image.value.resultUrl = URL.createObjectURL(result.blob)
+    image.value.resultSize = result.blob.size
+    image.value.originalWidth = result.originalWidth
+    image.value.originalHeight = result.originalHeight
+    image.value.resultWidth = result.width
+    image.value.resultHeight = result.height
     status.value = 'done'
-    progress.value = 100
     stopProcessingMessages()
   } catch (err) {
     status.value = 'error'
-    error.value = err.message || 'Background removal failed. Please try again.'
+    error.value = err.message || 'Upscale failed. Please try again.'
     stopProcessingMessages()
   }
-}
-
-const handleEditorUpdate = (blob) => {
-  if (!image.value) return
-  if (image.value.editedUrl) URL.revokeObjectURL(image.value.editedUrl)
-  image.value.editedUrl = URL.createObjectURL(blob)
-  image.value.resultUrl = image.value.editedUrl
-  image.value.resultSize = blob.size
 }
 
 const downloadResult = () => {
   if (!image.value?.resultUrl) return
 
+  const mimeType = getOutputMimeType(image.value.file, outputFormat.value)
+  const ext = getDownloadExtension(mimeType)
   const baseName = image.value.name.replace(/\.[^.]+$/, '')
+
   const link = document.createElement('a')
   link.href = image.value.resultUrl
-  link.download = `${baseName}-no-bg.png`
+  link.download = `${baseName}-${scale.value}x-upscaled.${ext}`
   link.click()
-}
-
-const toggleEditor = () => {
-  showEditor.value = !showEditor.value
 }
 
 onBeforeUnmount(resetWorkspace)
@@ -193,18 +197,16 @@ onBeforeUnmount(resetWorkspace)
   <div class="space-y-8">
     <div class="text-center max-w-2xl mx-auto">
       <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-        Background Remover
+        Image Upscaler
       </h1>
       <p class="mt-3 text-slate-500 text-base sm:text-lg">
-        Upload a photo and remove the background instantly in your browser.
-        Refine edges with the eraser when needed.
+        Drop in an image, choose how far to scale it, and export a sharper,
+        larger version directly from your browser.
       </p>
     </div>
 
     <div class="max-w-5xl mx-auto space-y-6">
-      <!-- Workspace -->
       <div class="space-y-6">
-        <!-- Drop zone -->
         <div
           v-if="!image"
           @dragenter="handleDragEnter"
@@ -227,18 +229,19 @@ onBeforeUnmount(resetWorkspace)
 
           <div class="px-6 py-12 sm:py-16 flex flex-col items-center text-center pointer-events-none">
             <div
-              class="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+              class="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 transition-colors"
               :class="isDragging ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H5.25A2.25 2.25 0 0 0 3 5.25v13.5A2.25 2.25 0 0 0 5.25 21Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.25 2.25 0 0 1 5.25 5.25h13.5A2.25 2.25 0 0 1 21 7.5v9A2.25 2.25 0 0 1 18.75 18.75H5.25A2.25 2.25 0 0 1 3 16.5v-9Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="m3 15 4.409-4.409a2.25 2.25 0 0 1 3.182 0L15 15m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0L21 15m-5.25-6.75h.008v.008h-.008V8.25Z" />
               </svg>
             </div>
             <p class="text-lg font-semibold text-slate-800">
               {{ isDragging ? 'Drop your image here' : 'Drag & drop an image' }}
             </p>
             <p class="mt-1.5 text-sm text-slate-500">
-              or <span class="text-indigo-600 font-medium">click to browse</span>
+              or <span class="text-indigo-600 font-medium">click to browse</span> - JPEG, PNG, WebP, GIF
             </p>
           </div>
         </div>
@@ -275,20 +278,19 @@ onBeforeUnmount(resetWorkspace)
           </div>
         </div>
 
-        <!-- Settings bar -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-6">
             <div>
-              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">SETTINGS</h2>
-              <div class="flex flex-wrap gap-2">
+              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Scale</h2>
+              <div class="grid grid-cols-3 gap-2">
                 <button
-                  v-for="option in modelOptions"
+                  v-for="option in scaleOptions"
                   :key="option.value"
                   type="button"
                   :disabled="isProcessing"
-                  @click="model = option.value"
-                  class="px-3 py-2 rounded-xl text-left border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="model === option.value
+                  @click="scale = option.value"
+                  class="px-2.5 py-2 rounded-lg text-left border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="scale === option.value
                     ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
                     : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
                 >
@@ -298,28 +300,85 @@ onBeforeUnmount(resetWorkspace)
               </div>
             </div>
 
-            <div v-if="image" class="flex flex-wrap gap-2 sm:justify-end">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Output format</h2>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="option in formatOptions"
+                  :key="option.value"
+                  type="button"
+                  :disabled="isProcessing"
+                  @click="outputFormat = option.value"
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="outputFormat === option.value
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Quality</h2>
+                <span class="text-sm font-bold text-indigo-600 tabular-nums">{{ quality }}%</span>
+              </div>
+              <input
+                v-model.number="quality"
+                type="range"
+                min="60"
+                max="100"
+                step="1"
+                :disabled="isProcessing"
+                class="w-full h-2 rounded-full appearance-none bg-slate-200 accent-indigo-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <div class="flex justify-between mt-1.5 text-xs text-slate-400">
+                <span>Smaller</span>
+                <span>Cleaner</span>
+              </div>
+            </div>
+
+            <div>
+              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Detail</h2>
               <button
                 type="button"
                 :disabled="isProcessing"
-                @click="processImage"
-                class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                @click="sharpen = !sharpen"
+                class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="sharpen
+                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
               >
-                {{ hasResult ? 'Remove background again' : 'Remove background' }}
-              </button>
-              <button
-                v-if="hasResult"
-                type="button"
-                @click="downloadResult"
-                class="px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                Download PNG
+                <span class="text-left">
+                  <span class="block text-sm font-medium text-slate-800">Sharpen edges</span>
+                  <span class="block text-xs text-slate-400">Crisper result</span>
+                </span>
+                <span
+                  class="relative w-10 h-6 rounded-full transition-colors"
+                  :class="sharpen ? 'bg-indigo-600' : 'bg-slate-200'"
+                >
+                  <span
+                    class="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                    :class="sharpen ? 'translate-x-4' : 'translate-x-0'"
+                  />
+                </span>
               </button>
             </div>
           </div>
+
+          <div v-if="image" class="mt-5 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              :disabled="isProcessing"
+              @click="processImage"
+              class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ hasResult ? 'Upscale again' : 'Upscale image' }}
+            </button>
+          </div>
         </div>
 
-        <!-- Processing -->
         <div
           v-if="isProcessing"
           class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-12"
@@ -331,76 +390,72 @@ onBeforeUnmount(resetWorkspace)
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             </div>
-            <h2 class="text-lg font-semibold text-slate-800">Removing background...</h2>
+            <h2 class="text-lg font-semibold text-slate-800">Upscaling image...</h2>
             <p class="mt-1 text-sm text-slate-500">{{ processingMessage }}</p>
-            <p class="mt-1 text-xs text-slate-400 truncate">{{ progressStage }}</p>
-
+            <p class="mt-1 text-xs text-slate-400">
+              Building a {{ scale }}x version with high-quality canvas smoothing.
+            </p>
             <div class="mt-6 h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                class="h-full bg-indigo-600 transition-all duration-300 rounded-full"
-                :style="{ width: `${Math.max(progress, 4)}%` }"
-              />
+              <div class="h-full w-2/3 bg-indigo-600 rounded-full animate-pulse" />
             </div>
-            <p class="mt-2 text-xs text-slate-400 tabular-nums">{{ progress }}%</p>
           </div>
         </div>
 
-        <!-- Error -->
         <div
           v-if="status === 'error'"
           class="bg-white rounded-2xl border border-red-200 shadow-sm p-8"
         >
           <div class="max-w-lg mx-auto text-center">
             <p class="text-red-600 font-medium">{{ error }}</p>
-            <button
-              type="button"
-              @click="processImage"
-              class="mt-4 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer"
-            >
-              Try again
-            </button>
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                @click="processImage"
+                class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                @click="resetWorkspace"
+                class="px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Upload new
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Results -->
         <template v-if="hasResult">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
+            <div class="min-w-0">
               <h2 class="font-semibold text-slate-800 truncate max-w-xs sm:max-w-md" :title="image.name">
                 {{ image.name }}
               </h2>
               <p class="text-sm text-slate-500 mt-0.5">
-                {{ formatBytes(image.originalSize) }}
-                <span v-if="image.resultSize"> → {{ formatBytes(image.resultSize) }} PNG</span>
+                {{ originalDimensions }} - {{ formatBytes(image.originalSize) }}
+                <span v-if="resultDimensions"> to {{ resultDimensions }} - {{ formatBytes(image.resultSize) }}</span>
               </p>
             </div>
-            <button
-              type="button"
-              @click="toggleEditor"
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer"
-              :class="showEditor
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'border border-slate-200 text-slate-700 hover:bg-slate-50'"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
-              </svg>
-              {{ showEditor ? 'Hide eraser' : 'Refine with eraser' }}
-            </button>
+
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                @click="resetWorkspace"
+                class="px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Upload new
+              </button>
+              <button
+                type="button"
+                @click="downloadResult"
+                class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer"
+              >
+                Download
+              </button>
+            </div>
           </div>
 
-          <!-- Eraser editor -->
-          <div v-if="showEditor" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-            <EraserCanvas
-              ref="eraserRef"
-              :key="`${image.resultBaseUrl}-${showEditor}`"
-              :image-url="image.editedUrl || image.resultBaseUrl"
-              :restore-url="image.resultBaseUrl"
-              @update="handleEditorUpdate"
-            />
-          </div>
-
-          <!-- Before / after preview -->
           <div class="grid sm:grid-cols-2 gap-4">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <p class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-100">
@@ -417,12 +472,12 @@ onBeforeUnmount(resetWorkspace)
 
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <p class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-100">
-                Background removed
+                Upscaled {{ scale }}x
               </p>
-              <div class="aspect-square checkerboard flex items-center justify-center p-4">
+              <div class="aspect-square bg-slate-100 flex items-center justify-center p-4">
                 <img
                   :src="image.resultUrl"
-                  :alt="`${image.name} without background`"
+                  :alt="`${image.name} upscaled`"
                   class="max-w-full max-h-full object-contain rounded-lg"
                 />
               </div>
@@ -442,7 +497,7 @@ onBeforeUnmount(resetWorkspace)
               @click="downloadResult"
               class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer"
             >
-              Download PNG
+              Download upscaled image
             </button>
           </div>
         </template>
@@ -450,16 +505,3 @@ onBeforeUnmount(resetWorkspace)
     </div>
   </div>
 </template>
-
-<style scoped>
-.checkerboard {
-  background-color: #f8fafc;
-  background-image:
-    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
-    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
-    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
-  background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
-}
-</style>
