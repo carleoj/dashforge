@@ -1,16 +1,32 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import NavDropdown from './components/NavDropdown.vue'
 import { toolCategories } from './config/tools.js'
 import { useTheme } from './composables/useTheme.js'
+import { useLikedTools } from './composables/useLikedTools.js'
 import './assets/theme.css'
   
 const route = useRoute()
 const { isDark, toggleTheme } = useTheme()
+const { isLiked } = useLikedTools()
 const isDrawerOpen = ref(false)
 const expandedMobileCategory = ref('image')
 const openDesktopCategory = ref(null)
+
+// Sort tools within each category to show liked tools first
+const sortedToolCategories = computed(() => {
+  return toolCategories.map(category => ({
+    ...category,
+    tools: [...category.tools].sort((a, b) => {
+      const aLiked = a.id && isLiked(a.id)
+      const bLiked = b.id && isLiked(b.id)
+      if (aLiked && !bLiked) return -1
+      if (!aLiked && bLiked) return 1
+      return 0
+    })
+  }))
+})
 
 const toggleDrawer = () => {
   isDrawerOpen.value = !isDrawerOpen.value
@@ -52,7 +68,7 @@ const toggleMobileCategory = (categoryId) => {
         </router-link>
 
         <nav class="hidden md:flex items-center gap-1">
-          <NavDropdown v-for="category in toolCategories" :key="category.id" :category="category"
+          <NavDropdown v-for="category in sortedToolCategories" :key="category.id" :category="category"
             :open-category-id="openDesktopCategory" @toggle="toggleDesktopCategory" @close="closeDesktopCategory" />
         </nav>
 
@@ -100,7 +116,7 @@ const toggleMobileCategory = (categoryId) => {
         </button>
       </div>
 
-      <div v-for="category in toolCategories" :key="category.id"
+      <div v-for="category in sortedToolCategories" :key="category.id"
         class="border rounded-xl overflow-hidden transition-colors"
         :class="isDark ? 'border-cyan-300/10 bg-white/[0.03]' : 'border-accent-primary/15 bg-[var(--card-bg)]'">
         <button type="button" @click="toggleMobileCategory(category.id)"
@@ -116,10 +132,24 @@ const toggleMobileCategory = (categoryId) => {
         <div v-if="expandedMobileCategory === category.id" class="py-1">
           <template v-for="tool in category.tools" :key="tool.label">
             <router-link v-if="tool.path" :to="tool.path" @click="closeDrawer"
-              class="block px-4 py-2.5 text-sm transition-colors" :class="route.name === tool.routeName
+              class="flex items-center justify-between px-4 py-2.5 text-sm transition-colors" :class="route.name === tool.routeName
                 ? (isDark ? 'bg-cyan-400/10 text-cyan-200' : 'bg-accent-primary/10 text-accent-primary') + ' font-medium'
                 : (isDark ? 'text-slate-300 hover:bg-white/10 hover:text-white' : 'text-[var(--text-secondary)] hover:bg-black/5 hover:text-[var(--text-primary)]')">
-              {{ tool.label }}
+              <span class="flex items-center gap-2">
+                {{ tool.label }}
+                <svg
+                  v-if="isLiked(tool.id)"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                  stroke="currentColor"
+                  class="w-4 h-4 transition-colors"
+                  :class="isDark ? 'text-pink-400' : 'text-pink-500'"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                </svg>
+              </span>
             </router-link>
             <span v-else class="flex items-center justify-between px-4 py-2.5 text-sm transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-muted)]'">
               {{ tool.label }}
