@@ -3,6 +3,9 @@ import { ref, computed, onBeforeUnmount } from 'vue'
 import EraserCanvas from '../components/EraserCanvas.vue'
 import { isImageFile, formatBytes } from '../utils/imageCompress.js'
 import { removeImageBackground } from '../utils/backgroundRemoval.js'
+import { useTheme } from '../composables/useTheme.js'
+
+const { isDark } = useTheme()
 
 const model = ref('balanced')
 const isDragging = ref(false)
@@ -192,10 +195,10 @@ onBeforeUnmount(resetWorkspace)
 <template>
   <div class="space-y-8">
     <div class="text-center max-w-2xl mx-auto">
-      <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight transition-colors" :class="isDark ? 'text-slate-900' : 'text-[#1a1a1a]'">
         Background Remover
       </h1>
-      <p class="mt-3 text-slate-500 text-base sm:text-lg">
+      <p class="mt-3 text-base sm:text-lg transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-secondary)]'">
         Upload a photo and remove the background instantly in your browser.
         Refine edges with the eraser when needed.
       </p>

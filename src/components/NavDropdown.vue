@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { categoryHasActiveTool } from '../config/tools.js'
+import { useTheme } from '../composables/useTheme.js'
 
 const props = defineProps({
   category: { type: Object, required: true },
@@ -11,6 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['navigate', 'toggle', 'close'])
 
 const route = useRoute()
+const { isDark } = useTheme()
 
 const isActive = computed(() => categoryHasActiveTool(props.category, route.name))
 const isOpen = computed(() => props.openCategoryId === props.category.id)
@@ -43,8 +45,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
       @click.stop="toggle"
       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
       :class="isActive || isOpen
-        ? 'bg-cyan-400/10 text-cyan-200 ring-1 ring-cyan-300/20'
-        : 'text-slate-300 hover:bg-white/10 hover:text-white'"
+        ? (isDark ? 'bg-cyan-400/10 text-cyan-200 ring-1 ring-cyan-300/20' : 'bg-accent-primary/10 text-[var(--accent-primary)] ring-1 ring-accent-primary/20')
+        : (isDark ? 'text-slate-300 hover:bg-white/10 hover:text-white' : 'text-[var(--text-primary)] hover:bg-black/5 hover:text-[var(--text-primary)]')"
       :aria-expanded="isOpen"
     >
       {{ category.label }}
@@ -63,7 +65,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
     <div
       v-if="isOpen"
-      class="absolute right-0 top-full mt-2 w-52 rounded-xl border border-cyan-300/15 bg-slate-950/95 py-1.5 shadow-2xl shadow-cyan-950/40 backdrop-blur z-50"
+      class="absolute right-0 top-full mt-2 w-52 rounded-xl border py-1.5 shadow-2xl backdrop-blur z-50 transition-colors"
+      :class="isDark ? 'border-cyan-300/15 bg-slate-950/95 shadow-cyan-950/40' : 'border-accent-primary/15 bg-[var(--bg-secondary)] shadow-black/20'"
     >
       <template v-for="tool in category.tools" :key="tool.label">
         <router-link
@@ -72,17 +75,18 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
           @click="handleNavigate"
           class="flex items-center justify-between px-3 py-2 mx-1.5 rounded-lg text-sm transition-colors"
           :class="route.name === tool.routeName
-            ? 'bg-cyan-400/10 text-cyan-200 font-medium'
-            : 'text-slate-300 hover:bg-white/10 hover:text-white'"
+            ? (isDark ? 'bg-cyan-400/10 text-cyan-200' : 'bg-accent-primary/10 text-accent-primary') + ' font-medium'
+            : (isDark ? 'text-slate-300 hover:bg-white/10 hover:text-white' : 'text-[var(--text-secondary)] hover:bg-black/5 hover:text-[var(--text-primary)]')"
         >
           {{ tool.label }}
         </router-link>
         <span
           v-else
-          class="flex items-center justify-between px-3 py-2 mx-1.5 rounded-lg text-sm text-slate-500 cursor-not-allowed"
+          class="flex items-center justify-between px-3 py-2 mx-1.5 rounded-lg text-sm cursor-not-allowed transition-colors"
+          :class="isDark ? 'text-slate-500' : 'text-[var(--text-muted)]'"
         >
           {{ tool.label }}
-          <span class="text-[10px] uppercase tracking-wide font-semibold bg-fuchsia-400/10 text-fuchsia-200 px-1.5 py-0.5 rounded">
+          <span class="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded transition-colors" :class="isDark ? 'bg-fuchsia-400/10 text-fuchsia-200' : 'bg-[var(--coming-soon-bg)] text-[var(--coming-soon-text)]'">
             Soon
           </span>
         </span>

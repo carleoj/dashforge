@@ -7,6 +7,9 @@ import {
   getOutputMimeType,
   isImageFile
 } from '../utils/imageCompress.js'
+import { useTheme } from '../composables/useTheme.js'
+
+const { isDark } = useTheme()
 
 const quality = ref(75)
 const maxDimension = ref(1920)
@@ -185,10 +188,10 @@ const downloadAll = () => {
   <div class="space-y-8">
     <!-- Page header -->
     <div class="text-center max-w-2xl mx-auto">
-      <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight transition-colors" :class="isDark ? 'text-slate-900' : 'text-[#1a1a1a]'">
         Image Compressor
       </h1>
-      <p class="mt-3 text-slate-500 text-base sm:text-lg">
+      <p class="mt-3 text-base sm:text-lg transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-secondary)]'">
         Drop your images here to shrink file size without leaving your browser.
         Adjust quality and dimensions to find the perfect balance.
       </p>

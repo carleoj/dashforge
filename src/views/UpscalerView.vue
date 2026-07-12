@@ -7,6 +7,9 @@ import {
   isImageFile
 } from '../utils/imageCompress.js'
 import { upscaleImage } from '../utils/imageUpscale.js'
+import { useTheme } from '../composables/useTheme.js'
+
+const { isDark } = useTheme()
 
 const scale = ref(2)
 const outputFormat = ref('auto')
@@ -196,10 +199,10 @@ onBeforeUnmount(resetWorkspace)
 <template>
   <div class="space-y-8">
     <div class="text-center max-w-2xl mx-auto">
-      <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight transition-colors" :class="isDark ? 'text-slate-900' : 'text-[#1a1a1a]'">
         Image Upscaler
       </h1>
-      <p class="mt-3 text-slate-500 text-base sm:text-lg">
+      <p class="mt-3 text-base sm:text-lg transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-secondary)]'">
         Drop in an image, choose how far to scale it, and export a sharper,
         larger version directly from your browser.
       </p>

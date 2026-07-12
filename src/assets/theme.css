@@ -1,0 +1,54 @@
+/* Tokyo Night Storm (Dark Theme) */
+:root,
+.dark {
+  --bg-primary: #1a1b26;
+  --bg-secondary: #24283b;
+  --bg-tertiary: #414868;
+  --text-primary: #c0caf5;
+  --text-secondary: #a9b1d6;
+  --text-muted: #565f89;
+  --accent-primary: #7aa2f7;
+  --accent-secondary: #bb9af7;
+  --accent-tertiary: #7dcfff;
+  --border-color: rgba(122, 162, 247, 0.1);
+  --border-hover: rgba(122, 162, 247, 0.2);
+  --shadow-color: rgba(26, 27, 38, 0.3);
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-hover: rgba(255, 255, 255, 0.04);
+  --backdrop-bg: rgba(26, 27, 38, 0.85);
+  --coming-soon-bg: rgba(187, 154, 247, 0.1);
+  --coming-soon-text: #f6c8ce;
+}
+
+/* Clean Ivory Light (Light Theme) */
+.light {
+  --bg-primary: #faf8f5;
+  --bg-secondary: #f5f3ef;
+  --bg-tertiary: #e8e6e1;
+  --text-primary: #2d2a26;
+  --text-secondary: #5c5853;
+  --text-muted: #8a8680;
+  --accent-primary: #4a7c59;
+  --accent-secondary: #6b8e23;
+  --accent-tertiary: #8b9a6d;
+  --border-color: rgba(74, 124, 89, 0.12);
+  --border-hover: rgba(74, 124, 89, 0.2);
+  --shadow-color: rgba(45, 42, 38, 0.08);
+  --card-bg: rgba(255, 255, 255, 0.6);
+  --card-hover: rgba(255, 255, 255, 0.8);
+  --backdrop-bg: rgba(250, 248, 245, 0.9);
+  --coming-soon-bg: rgba(107, 142, 35, 0.1);
+  --coming-soon-text: #6b8e23;
+}
+
+/* Base styles */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html {
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
+}
