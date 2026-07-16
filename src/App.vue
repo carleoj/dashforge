@@ -187,20 +187,20 @@ const toggleMobileCategory = (categoryId) => {
                 Enjoy using DashForge? Consider buying me a coffee to support continued development and keep these tools free for everyone.
               </p>
               <div class="rounded-lg p-4 border transition-colors" :class="isDark ? 'bg-slate-950/50 border-cyan-300/10' : 'bg-black/5 border-accent-primary/15'">
-                <p class="text-xs uppercase tracking-wide font-semibold mb-2 transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-muted)]'">Payment Details</p>
+                <p class="text-xs uppercase tracking-wide font-semibold mb-2 transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-muted)]'">Account Details</p>
                 <div class="space-y-2 text-sm">
                   <div class="flex items-center gap-2">
-                    <span class="transition-colors" :class="isDark ? 'text-slate-400' : 'text-[var(--text-secondary)]'">GCash:</span>
-                    <span class="font-mono transition-colors" :class="isDark ? 'text-cyan-200' : 'text-[var(--accent-primary)]'">0912-345-6789</span>
+                    <span class="transition-colors" :class="isDark ? 'text-slate-400' : 'text-[var(--text-secondary)]'">GCash (C*** J***** P**o):</span>
+                    <span class="font-mono transition-colors" :class="isDark ? 'text-cyan-200' : 'text-[var(--accent-primary)]'">0929-727-4876</span>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <!-- <div class="flex items-center gap-2">
                     <span class="transition-colors" :class="isDark ? 'text-slate-400' : 'text-[var(--text-secondary)]'">PayPal:</span>
                     <span class="font-mono transition-colors" :class="isDark ? 'text-cyan-200' : 'text-[var(--accent-primary)]'">dashforge@example.com</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="transition-colors" :class="isDark ? 'text-slate-400' : 'text-[var(--text-secondary)]'">BPI:</span>
                     <span class="font-mono transition-colors" :class="isDark ? 'text-cyan-200' : 'text-[var(--accent-primary)]'">1234-5678-9012</span>
-                  </div>
+                  </div> -->
                 </div>
               </div>
             </div>
