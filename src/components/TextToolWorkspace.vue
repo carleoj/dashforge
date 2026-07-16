@@ -119,7 +119,7 @@ const clearText = () => {
         @dragleave="handleDragLeave"
         @dragover="handleDragOver"
         @drop="handleDrop"
-        class="rounded-2xl border border-slate-300 bg-white shadow-sm overflow-hidden transition-all"
+        class="rounded-2xl border border-slate-300 bg-white overflow-hidden transition-all"
         :class="isDragging ? 'border-indigo-400 bg-indigo-50/70' : 'border-slate-300 bg-white'"
       >
         <div class="flex flex-col lg:flex-row">
@@ -153,7 +153,7 @@ const clearText = () => {
               v-model="textValue"
               rows="10"
               :placeholder="placeholder"
-              class="w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-700 outline-none shadow-[inset_0_1px_2px_rgba(15,23,42,0.06)] focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all resize-y min-h-44"
+              class="w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-700 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all resize-y min-h-44"
             />
 
             <div class="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
