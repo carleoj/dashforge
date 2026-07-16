@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import CompressView from '../views/CompressView.vue'
 import BgRemoverView from '../views/BgRemover.vue'
 import UpscalerView from '../views/UpscalerView.vue'
+import WordCounterView from '../views/WordCounterView.vue'
+import CaseConverterView from '../views/CaseConverterView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -25,7 +27,16 @@ const router = createRouter({
       name: 'upscaler',
       component: UpscalerView
     },
-
+    {
+      path: '/word-counter',
+      name: 'word-counter',
+      component: WordCounterView
+    },
+    {
+      path: '/case-converter',
+      name: 'case-converter',
+      component: CaseConverterView
+    }
   ]
 })
 

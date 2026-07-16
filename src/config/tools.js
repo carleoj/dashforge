@@ -20,8 +20,8 @@ export const toolCategories = [
     id: 'texts',
     label: 'Texts',
     tools: [
-      { id: 'word-counter', label: 'Word Counter', path: null, routeName: null, comingSoon: true },
-      { id: 'case-converter', label: 'Case Converter', path: null, routeName: null, comingSoon: true }
+      { id: 'word-counter', label: 'Word Counter', path: '/word-counter', routeName: 'word-counter' },
+      { id: 'case-converter', label: 'Case Converter', path: '/case-converter', routeName: 'case-converter' }
     ]
   }
 ]
