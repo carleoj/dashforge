@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useTheme } from '../composables/useTheme.js'
 import { useLikedTools } from '../composables/useLikedTools.js'
 
@@ -8,12 +8,18 @@ const props = defineProps({
   subtitle: { type: String, required: true },
   toolId: { type: String, required: true },
   placeholder: { type: String, default: 'Paste or type your text here...' },
-  fileAccept: { type: String, default: '.txt,.md,.csv,.json,.html,.xml,.js,.ts,.vue,.css,.scss' }
+  fileAccept: { type: String, default: '.txt,.md,.csv,.json,.html,.xml,.js,.ts,.vue,.css,.scss' },
+  modelValue: { type: String, default: '' }
 })
+
+const emit = defineEmits(['update:modelValue'])
 
 const { isDark } = useTheme()
 const { isLiked, toggleLike } = useLikedTools()
-const textValue = defineModel({ type: String, default: '' })
+const textValue = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+})
 
 const isDragging = ref(false)
 const dragCounter = ref(0)
@@ -27,7 +33,7 @@ const openFilePicker = () => {
 const readTextFile = async (file) => {
   try {
     const content = await file.text()
-    textValue.value = content
+    emit('update:modelValue', content)
     fileError.value = ''
   } catch (error) {
     fileError.value = error?.message || 'Unable to read this file.'
@@ -72,7 +78,7 @@ const handleDrop = async (event) => {
 }
 
 const clearText = () => {
-  textValue.value = ''
+  emit('update:modelValue', '')
   fileError.value = ''
 }
 </script>
