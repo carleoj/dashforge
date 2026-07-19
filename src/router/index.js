@@ -4,6 +4,7 @@ import BgRemoverView from '../views/BgRemover.vue'
 import UpscalerView from '../views/UpscalerView.vue'
 import WordCounterView from '../views/WordCounterView.vue'
 import CaseConverterView from '../views/CaseConverterView.vue'
+import TextExtractorView from '../views/TextExtractor.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,11 @@ const router = createRouter({
       path: '/case-converter',
       name: 'case-converter',
       component: CaseConverterView
+    },
+    {
+      path: '/text-extractor',
+      name: 'text-extractor',
+      component: TextExtractorView
     }
   ]
 })

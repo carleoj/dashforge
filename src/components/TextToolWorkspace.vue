@@ -158,7 +158,6 @@ const clearText = () => {
 
             <div class="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <p class="text-sm text-slate-500">
-                Supports plain text files such as .txt, .md, .csv, .json, and code files.
               </p>
               <p v-if="fileError" class="text-sm text-rose-600">{{ fileError }}</p>
             </div>
