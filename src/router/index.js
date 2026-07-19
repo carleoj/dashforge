@@ -5,6 +5,7 @@ import UpscalerView from '../views/UpscalerView.vue'
 import WordCounterView from '../views/WordCounterView.vue'
 import CaseConverterView from '../views/CaseConverterView.vue'
 import TextExtractorView from '../views/TextExtractor.vue'
+import PDFCompressorView from '../views/PDFCompressor.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -42,6 +43,11 @@ const router = createRouter({
       path: '/text-extractor',
       name: 'text-extractor',
       component: TextExtractorView
+    },
+    {
+      path: '/pdf-compressor',
+      name: 'pdf-compressor',
+      component: PDFCompressorView
     }
   ]
 })

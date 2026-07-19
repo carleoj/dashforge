@@ -272,7 +272,7 @@ const toggleMobileCategory = (categoryId) => {
         <!-- Copyright -->
         <div class="mt-12 pt-8 border-t text-center transition-colors" :class="isDark ? 'border-cyan-300/10' : 'border-accent-primary/15'">
           <p class="text-sm transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-muted)]'">
-            © {{ new Date().getFullYear() }} DashForge. All rights reserved. Made with ❤️ for the community.
+            © {{ new Date().getFullYear() }} DashForge by Carl Paño. All rights reserved.
           </p>
         </div>
       </div>

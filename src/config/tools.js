@@ -13,8 +13,8 @@ export const toolCategories = [
     label: 'Files',
     tools: [
       { id: 'text-extractor', label: 'Text Extractor', path: '/text-extractor', routeName: 'text-extractor' },
-      { id: 'pdf-merge', label: 'PDF Merge', path: null, routeName: null, comingSoon: true },
-      { id: 'file-converter', label: 'File Converter', path: null, routeName: null, comingSoon: true }
+      { id: 'pdf-compressor', label: 'PDF Compressor', path: '/pdf-compressor', routeName: 'pdf-compressor' },
+      { id: 'pdf-merge', label: 'PDF Merge', path: null, routeName: null, comingSoon: true }
     ]
   },
   {
