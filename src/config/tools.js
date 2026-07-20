@@ -22,7 +22,8 @@ export const toolCategories = [
     label: 'Texts',
     tools: [
       { id: 'word-counter', label: 'Word Counter', path: '/word-counter', routeName: 'word-counter' },
-      { id: 'case-converter', label: 'Case Converter', path: '/case-converter', routeName: 'case-converter' }
+      { id: 'case-converter', label: 'Case Converter', path: '/case-converter', routeName: 'case-converter' },
+      { id: 'text-cleaner', label: 'Text Cleaner', path: '/text-cleaner', routeName: 'text-cleaner' }
     ]
   }
 ]

@@ -4,6 +4,7 @@ import BgRemoverView from '../views/BgRemover.vue'
 import UpscalerView from '../views/UpscalerView.vue'
 import WordCounterView from '../views/WordCounterView.vue'
 import CaseConverterView from '../views/CaseConverterView.vue'
+import TextCleanerView from '../views/TextCleanerView.vue'
 import TextExtractorView from '../views/TextExtractor.vue'
 import PDFCompressorView from '../views/PDFCompressor.vue'
 
@@ -38,6 +39,11 @@ const router = createRouter({
       path: '/case-converter',
       name: 'case-converter',
       component: CaseConverterView
+    },
+    {
+      path: '/text-cleaner',
+      name: 'text-cleaner',
+      component: TextCleanerView
     },
     {
       path: '/text-extractor',
