@@ -191,7 +191,10 @@ const downloadAll = () => {
 <template>
   <div class="space-y-8">
     <!-- Page header -->
-    <div class="text-center max-w-2xl mx-auto">
+    <div class="text-center max-w-2xl mx-auto relative">
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight transition-colors" :class="isDark ? 'text-slate-900' : 'text-[#1a1a1a]'">
+        Image Compressor
+      </h1>
       <button
         @click="toggleLike(toolId)"
         class="absolute top-0 right-0 p-2 rounded-lg transition-colors cursor-pointer"
@@ -210,9 +213,6 @@ const downloadAll = () => {
           <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
         </svg>
       </button>
-      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight transition-colors" :class="isDark ? 'text-slate-900' : 'text-[#1a1a1a]'">
-        Image Compressor
-      </h1>
       <p class="mt-3 text-base sm:text-lg transition-colors" :class="isDark ? 'text-slate-500' : 'text-[var(--text-secondary)]'">
         Drop your images here to shrink file size without leaving your browser.
         Adjust quality and dimensions to find the perfect balance.
