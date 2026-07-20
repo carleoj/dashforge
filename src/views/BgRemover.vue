@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import EraserCanvas from '../components/EraserCanvas.vue'
 import { isImageFile, formatBytes } from '../utils/imageCompress.js'
 import { removeImageBackground } from '../utils/backgroundRemoval.js'
@@ -12,6 +12,8 @@ const { isLiked, toggleLike } = useLikedTools()
 const toolId = 'bg-remover'
 
 const model = ref('balanced')
+const backgroundMode = ref('transparent')
+const backgroundColor = ref('#ffffff')
 const isDragging = ref(false)
 const dragCounter = ref(0)
 const fileInput = ref(null)
@@ -32,6 +34,13 @@ const modelOptions = [
   { label: 'Quality', value: 'quality', hint: 'Best edges' }
 ]
 
+const backgroundPresets = [
+  { label: 'Transparent', value: 'transparent', swatch: 'checkerboard' },
+  { label: 'White', value: '#ffffff', swatch: '#ffffff' },
+  { label: 'Black', value: '#000000', swatch: '#000000' },
+  { label: 'Green Screen', value: '#00ff66', swatch: '#00ff66' }
+]
+
 const processingMessages = [
   'Reading the image and preparing the mask.',
   'Finding the subject edges.',
@@ -43,6 +52,77 @@ const processingMessages = [
 const hasResult = computed(() => status.value === 'done' && image.value?.resultUrl)
 const isProcessing = computed(() => status.value === 'processing')
 const processingMessage = computed(() => processingMessages[processingMessageIndex.value])
+const isCustomColorActive = computed(() =>
+  backgroundMode.value === 'color' &&
+  !backgroundPresets.some((preset) => preset.value === backgroundColor.value)
+)
+const resultPreviewStyle = computed(() => {
+  if (backgroundMode.value !== 'color') return {}
+  return { backgroundColor: backgroundColor.value }
+})
+
+const getForegroundSourceUrl = () => image.value?.editedUrl || image.value?.resultBaseUrl || null
+
+const loadImageFromUrl = (url) =>
+  new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Unable to prepare the background fill preview.'))
+    img.src = url
+  })
+
+const blobToObjectUrl = (blob) => URL.createObjectURL(blob)
+
+const renderImageWithBackground = async (sourceUrl, color) => {
+  const subject = await loadImageFromUrl(sourceUrl)
+  const canvas = document.createElement('canvas')
+  canvas.width = subject.naturalWidth
+  canvas.height = subject.naturalHeight
+
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = color
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(subject, 0, 0)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Unable to generate the background-filled image.'))
+        return
+      }
+      resolve(blob)
+    }, 'image/png')
+  })
+}
+
+const updateResultPresentation = async () => {
+  if (!image.value) return
+
+  const sourceUrl = getForegroundSourceUrl()
+  if (!sourceUrl) return
+
+  const previousResultUrl = image.value.resultUrl
+
+  if (backgroundMode.value === 'transparent') {
+    image.value.resultUrl = sourceUrl
+    if (sourceUrl !== image.value.resultBaseUrl && sourceUrl !== image.value.editedUrl) {
+      image.value.resultSize = null
+    }
+    if (previousResultUrl && previousResultUrl !== image.value.resultBaseUrl && previousResultUrl !== image.value.editedUrl) {
+      URL.revokeObjectURL(previousResultUrl)
+    }
+    return
+  }
+
+  const filledBlob = await renderImageWithBackground(sourceUrl, backgroundColor.value)
+  const filledUrl = blobToObjectUrl(filledBlob)
+  image.value.resultUrl = filledUrl
+  image.value.resultSize = filledBlob.size
+
+  if (previousResultUrl && previousResultUrl !== image.value.resultBaseUrl && previousResultUrl !== image.value.editedUrl) {
+    URL.revokeObjectURL(previousResultUrl)
+  }
+}
 
 const stopProcessingMessages = () => {
   if (!processingMessageTimer.value) return
@@ -75,7 +155,8 @@ const resetWorkspace = () => {
   progressStage.value = ''
   error.value = null
   showEditor.value = false
-  startProcessingMessages()
+  backgroundMode.value = 'transparent'
+  backgroundColor.value = '#ffffff'
 }
 
 const openFilePicker = () => {
@@ -141,6 +222,7 @@ const processImage = async () => {
   progressStage.value = 'Preparing…'
   error.value = null
   showEditor.value = false
+  startProcessingMessages()
 
   if (image.value.resultUrl) URL.revokeObjectURL(image.value.resultUrl)
   if (image.value.resultBaseUrl) URL.revokeObjectURL(image.value.resultBaseUrl)
@@ -158,9 +240,10 @@ const processImage = async () => {
     })
 
     const resultUrl = URL.createObjectURL(blob)
-    image.value.resultUrl = resultUrl
     image.value.resultBaseUrl = resultUrl
+    image.value.resultUrl = resultUrl
     image.value.resultSize = blob.size
+    await updateResultPresentation()
     status.value = 'done'
     progress.value = 100
     stopProcessingMessages()
@@ -175,8 +258,11 @@ const handleEditorUpdate = (blob) => {
   if (!image.value) return
   if (image.value.editedUrl) URL.revokeObjectURL(image.value.editedUrl)
   image.value.editedUrl = URL.createObjectURL(blob)
-  image.value.resultUrl = image.value.editedUrl
   image.value.resultSize = blob.size
+  updateResultPresentation().catch((err) => {
+    status.value = 'error'
+    error.value = err.message || 'Unable to apply the selected background color.'
+  })
 }
 
 const downloadResult = () => {
@@ -185,13 +271,33 @@ const downloadResult = () => {
   const baseName = image.value.name.replace(/\.[^.]+$/, '')
   const link = document.createElement('a')
   link.href = image.value.resultUrl
-  link.download = `${baseName}-no-bg.png`
+  link.download = backgroundMode.value === 'transparent'
+    ? `${baseName}-no-bg.png`
+    : `${baseName}-bg-filled.png`
   link.click()
 }
 
 const toggleEditor = () => {
   showEditor.value = !showEditor.value
 }
+
+const applyBackgroundPreset = (presetValue) => {
+  if (presetValue === 'transparent') {
+    backgroundMode.value = 'transparent'
+    return
+  }
+
+  backgroundColor.value = presetValue
+  backgroundMode.value = 'color'
+}
+
+watch([backgroundMode, backgroundColor], () => {
+  if (!hasResult.value) return
+  updateResultPresentation().catch((err) => {
+    status.value = 'error'
+    error.value = err.message || 'Unable to apply the selected background color.'
+  })
+})
 
 onBeforeUnmount(resetWorkspace)
 </script>
@@ -302,44 +408,103 @@ onBeforeUnmount(resetWorkspace)
 
         <!-- Settings bar -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">SETTINGS</h2>
-              <div class="flex flex-wrap gap-2">
+          <div class="flex flex-col gap-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">SETTINGS</h2>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="option in modelOptions"
+                    :key="option.value"
+                    type="button"
+                    :disabled="isProcessing"
+                    @click="model = option.value"
+                    class="px-3 py-2 rounded-xl text-left border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :class="model === option.value
+                      ? 'border-indigo-300 ring-1 ring-indigo-200'
+                      : 'border-slate-200 hover:border-slate-300'"
+                  >
+                    <span class="block text-sm font-medium text-slate-800">{{ option.label }}</span>
+                    <span class="block text-xs text-slate-400">{{ option.hint }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="image" class="flex flex-wrap gap-2 sm:justify-end">
                 <button
-                  v-for="option in modelOptions"
-                  :key="option.value"
                   type="button"
                   :disabled="isProcessing"
-                  @click="model = option.value"
-                  class="px-3 py-2 rounded-xl text-left border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="model === option.value
-                    ? 'border-indigo-300 ring-1 ring-indigo-200'
-                    : 'border-slate-200 hover:border-slate-300'"
+                  @click="processImage"
+                  class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span class="block text-sm font-medium text-slate-800">{{ option.label }}</span>
-                  <span class="block text-xs text-slate-400">{{ option.hint }}</span>
+                  {{ hasResult ? 'Remove background again' : 'Remove background' }}
+                </button>
+                <button
+                  v-if="hasResult"
+                  type="button"
+                  @click="downloadResult"
+                  class="px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 transition-colors cursor-pointer"
+                >
+                  Download PNG
                 </button>
               </div>
             </div>
 
-            <div v-if="image" class="flex flex-wrap gap-2 sm:justify-end">
-              <button
-                type="button"
-                :disabled="isProcessing"
-                @click="processImage"
-                class="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {{ hasResult ? 'Remove background again' : 'Remove background' }}
-              </button>
-              <button
-                v-if="hasResult"
-                type="button"
-                @click="downloadResult"
-                class="px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 transition-colors cursor-pointer"
-              >
-                Download PNG
-              </button>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                <div class="max-w-xl">
+                  <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Background fill</p>
+                  <p class="mt-1 text-sm text-slate-500">
+                    Keep the cutout transparent, pick a preset, or choose any custom RGB color for the final preview and PNG.
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="preset in backgroundPresets"
+                    :key="preset.label"
+                    type="button"
+                    :disabled="isProcessing"
+                    @click="applyBackgroundPreset(preset.value)"
+                    class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :class="(preset.value === 'transparent' && backgroundMode === 'transparent') || (preset.value !== 'transparent' && backgroundMode === 'color' && backgroundColor === preset.value)
+                      ? 'border-indigo-300 bg-white ring-1 ring-indigo-200 text-slate-800'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
+                  >
+                    <span
+                      class="h-5 w-5 rounded-full border border-slate-200"
+                      :class="preset.swatch === 'checkerboard' ? 'bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:10px_10px] bg-[position:0_0,0_5px,5px_-5px,-5px_0]' : ''"
+                      :style="preset.swatch !== 'checkerboard' ? { backgroundColor: preset.swatch } : {}"
+                    />
+                    {{ preset.label }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <label class="text-sm font-medium text-slate-700">Custom RGB color</label>
+                <div class="flex items-center gap-3">
+                  <input
+                    v-model="backgroundColor"
+                    type="color"
+                    :disabled="isProcessing"
+                    @input="backgroundMode = 'color'"
+                    class="h-11 w-16 rounded-xl border border-slate-200 bg-white p-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <button
+                    type="button"
+                    :disabled="isProcessing"
+                    @click="backgroundMode = 'color'"
+                    class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :class="backgroundMode === 'color'
+                      ? 'border-indigo-300 bg-white ring-1 ring-indigo-200 text-slate-800'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
+                  >
+                    Use {{ isCustomColorActive ? 'custom color' : backgroundColor.toUpperCase() }}
+                  </button>
+                  <span class="text-sm text-slate-500 font-mono uppercase">{{ backgroundColor }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -442,9 +607,13 @@ onBeforeUnmount(resetWorkspace)
 
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <p class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-100">
-                Background removed
+                {{ backgroundMode === 'transparent' ? 'Background removed' : 'Background filled' }}
               </p>
-              <div class="aspect-square checkerboard flex items-center justify-center p-4">
+              <div
+                class="aspect-square flex items-center justify-center p-4"
+                :class="backgroundMode === 'transparent' ? 'checkerboard' : ''"
+                :style="resultPreviewStyle"
+              >
                 <img
                   :src="image.resultUrl"
                   :alt="`${image.name} without background`"
